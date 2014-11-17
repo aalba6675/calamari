@@ -18,6 +18,7 @@ from rest_framework import viewsets, status
 from rest_framework.views import APIView
 import time
 
+from rest_framework.permissions import BasePermission, SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
 
 try:
@@ -73,7 +74,22 @@ else:
         pass
 
 
+class IsRoleAllowed(BasePermission):
+
+    def has_permission(self, request, view):
+        has_permission = False
+        if request.user.groups.filter(name='readonly').exists():
+            has_permission = request.method in SAFE_METHODS
+        elif request.user.groups.filter(name='read/write').exists():
+            has_permission = True
+        elif request.user.is_superuser:
+            has_permission = True
+
+        return has_permission
+
+
 class RPCView(APIView):
+    permission_classes = [IsAuthenticated, IsRoleAllowed]
     serializer_class = None
     log = logging.getLogger('django.request.profile')
 
