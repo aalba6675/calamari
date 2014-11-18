@@ -107,11 +107,27 @@ class Space(RPCView):
                 return None
 
         df_path = lambda stat_name: "ceph.cluster.{0}.df.{1}".format(fsid, stat_name)
-        space = {
-            'used_bytes': to_bytes(get_latest_graphite(df_path('total_used'))),
-            'capacity_bytes': to_bytes(get_latest_graphite(df_path('total_space'))),
-            'free_bytes': to_bytes(get_latest_graphite(df_path('total_avail')))
-        }
+        # Check for old vs. new stats (changed in Ceph Firefly)
+        # see Ceph commit ee2dbdb0f5e54fe6f9c5999c032063b084424c4c
+        # Old:          New:
+        # total_used    total_used_bytes
+        # total_space   total_bytes
+        # total_avail   total_avail_bytes
+        #
+        # the old stats are in terms of kB (must multiply to get bytes);
+        # the new ones are already in bytes
+        if get_latest_graphite(df_path('total_used')) is not None:
+            space = {
+                'used_bytes': to_bytes(get_latest_graphite(df_path('total_used'))),
+                'capacity_bytes': to_bytes(get_latest_graphite(df_path('total_space'))),
+                'free_bytes': to_bytes(get_latest_graphite(df_path('total_avail')))
+            }
+        else:
+            space = {
+                'used_bytes': get_latest_graphite(df_path('total_used_bytes')),
+                'capacity_bytes': get_latest_graphite(df_path('total_bytes')),
+                'free_bytes': get_latest_graphite(df_path('total_avail_bytes'))
+            }
 
         return Response(ClusterSpaceSerializer(DataObject({
             'space': space
